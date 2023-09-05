@@ -1,0 +1,72 @@
+name: Lint and App Inspect CLI
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v4
+        with:
+          # Semantic version range syntax or exact version of a Python version
+          python-version: '3.9'
+          # Optional - x64 or x86 architecture, defaults to x64
+          architecture: 'x64'
+
+      - name: Install deps
+        uses: CultureHQ/actions-yarn@master
+        with:
+          args: install
+
+      - name: Lint
+        uses: CultureHQ/actions-yarn@master
+        with:
+          args: lint
+
+      - name: Build
+        uses: CultureHQ/actions-yarn@master
+        with:
+          args: build
+
+      - name: Update Version Number
+        run: |
+          old_str="X.Y.Z"
+          new_str="1.0.0"
+          sed -i "s/$old_str/$new_str/g" package.json
+          sed -i "s/$old_str/$new_str/g" ./splunk_app_for_devsecops/default/app.conf
+
+      - name: Install slim
+        run: |
+          pip install https://download.splunk.com/misc/packaging-toolkit/splunk-packaging-toolkit-1.0.1.tar.gz
+
+      - name: Create package
+        run: |
+          mkdir build
+          slim package ./splunk_app_for_devsecops
+
+      - name: Run App Inspect CLI
+        uses: splunk/appinspect-cli-action@v1.5
+        with:
+          app_path: splunk_app_for_devsecops-1.0.0.tar.gz
+          included_tags: cloud, splunk_appinspect
+
+      - name: Upload package
+        uses: actions/upload-artifact@v3
+        with:
+          name: splunk_app_for_devsecops-1.0.0.tar.gz
+          path: ./splunk_app_for_devsecops-1.0.0.tar.gz
