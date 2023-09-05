@@ -1,0 +1,851 @@
+<form version="1.1" script="token_buttons.js" theme="dark">
+  <label>Notable Changes Analysis</label>
+  <init>
+    <set token="filtered_events">Analyzing ...</set>
+    <set token="total_events">Analyzing ...</set>
+    <set token="total_events2">Analyzing ...</set>
+    
+    <set token="found_vendor_regions"></set>
+    <set token="found_users"></set>
+    <set token="found_user_types"></set>
+    <set token="found_srcs"></set>
+    <set token="found_dests"></set>
+    <set token="found_change_types"></set>
+    <set token="found_commands"></set>
+    <set token="found_actions"></set>
+    <set token="found_objects"></set>
+    <set token="found_object_categorys"></set>
+    
+    <set token="selected_vendor_regions"></set>
+    <set token="selected_users"></set>
+    <set token="selected_user_types"></set>
+    <set token="selected_srcs"></set>
+    <set token="selected_dests"></set>
+    <set token="selected_change_types"></set>
+    <set token="selected_commands"></set>
+    <set token="selected_actions"></set>
+    <set token="selected_objects"></set>
+    <set token="selected_object_categorys"></set>
+  </init>
+  <search>
+    <query>
+      <![CDATA[
+| tstats count summariesonly=1 FROM datamodel=Change
+      ]]>
+    </query>
+    <earliest>$timeframe.earliest$</earliest>
+    <latest>$timeframe.latest$</latest>
+    <progress>
+      <set token="total_events">Analyzing ...</set>
+    </progress>
+    <done>
+      <eval token="total_events">tostring($result.count$,"commas")</eval>
+    </done>
+  </search>
+  <search>
+    <query>
+      <![CDATA[
+| tstats count summariesonly=1 FROM datamodel=Change
+  WHERE *
+  $selected_vendor_regions$
+  $selected_users$
+  $selected_user_types$
+  $selected_srcs$
+  $selected_dests$
+  $selected_change_types$
+  $selected_commands$
+  $selected_actions$
+  $selected_objects$
+  $selected_object_categorys$
+      ]]>
+    </query>
+    <earliest>$selection.earliest$</earliest>
+    <latest>$selection.latest$</latest>
+    <progress>
+      <set token="filtered_events">Analyzing ...</set>
+    </progress>
+    <done>
+      <eval token="filtered_events">tostring($result.count$,"commas")</eval>
+    </done>
+  </search>
+  <!-- ========================================================================================================================= -->
+  <search id="base_mt">
+    <query>
+      <![CDATA[
+| tstats c summariesonly=1 fillnull_value="---"
+  FROM datamodel=Change
+  WHERE *
+  $selected_vendor_regions$
+  $selected_users$
+  $selected_user_types$
+  $selected_srcs$
+  $selected_dests$
+  $selected_change_types$
+  $selected_commands$
+  $selected_actions$
+  $selected_objects$
+  $selected_object_categorys$
+  BY All_Changes.vendor_region All_Changes.user All_Changes.user_type All_Changes.src All_Changes.dest All_Changes.change_type All_Changes.command All_Changes.action All_Changes.object All_Changes.object_category
+| rename All_Changes.* as * 
+| eventstats sum(c) as _count
+| fields *
+      ]]>
+    </query>
+    <earliest>$selection.earliest$</earliest>
+    <latest>$selection.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <!-- ========================================================================================================================= -->
+  <fieldset submitButton="false">
+    <input type="time" token="timeframe" searchWhenChanged="true">
+      <label>Select timeframe:</label>
+      <default>
+        <earliest>-6mon@mon</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <div>
+          <a style="float:left;font-weight:normal;font-size:120%;color:#dc4e41;border:1px solid #dc4e41;padding:2px 12px 1px; border-radius:8px;background-color:#4e1c17;margin:1px 10px 1px 0;" href="/app/$env:app$/$env:page$">Reset Dashboard</a>
+          <a style="display:none;float:left;font-weight:normal;font-size:120%;color:#dddd66;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#43431f;margin:1px 10px 1px 0;" type="button" data-token-json="{&quot;form.ad_hoc_search_spl&quot;:&quot;*&quot;,&quot;form.find_user_id&quot;:&quot;*&quot;,&quot;form.selected_user_id&quot;:&quot;*&quot;}" href="#">
+          Clear Search Filters
+          </a>          
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    
+    <panel>
+      <title>Combined Timechart of all events ($total_events$):</title>
+      <chart>
+        <search>
+          <query>
+| tstats summariesonly=1 c as "All Events" FROM datamodel=Change BY _time span=12h
+| timechart span=12h sum("All Events") as "All Events"
+          </query>
+          <earliest>$timeframe.earliest$</earliest>
+          <latest>$timeframe.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <selection>
+          <eval token="selection.earliest">if(isnum($start$) AND isnum($end$), $start$, $timeframe.earliest$)</eval>
+          <eval token="selection.latest">if(isnum($start$) AND isnum($end$), $end$, $timeframe.latest$)</eval>
+          <eval token="selection_earliest">strftime('selection.earliest', "%Y-%m-%d %H:%M:%S")</eval>
+          <eval token="selection_latest">strftime('selection.latest', "%Y-%m-%d %H:%M:%S")</eval>
+        </selection>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">Events</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"All Events":#888888}</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Filtered Events ($filtered_events$):</title>
+      <chart>
+        <search>
+          <query>
+            <![CDATA[
+| tstats summariesonly=1 c as "Filtered Events" FROM datamodel=Change
+  WHERE *
+  $selected_vendor_regions$
+  $selected_users$
+  $selected_user_types$
+  $selected_srcs$
+  $selected_dests$
+  $selected_change_types$
+  $selected_commands$
+  $selected_actions$
+  $selected_objects$
+  $selected_object_categorys$
+  BY _time span=1h
+| timechart span=1h sum("Filtered Events") as "Filtered Events"
+            ]]>
+          </query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <selection></selection>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"All Events":#006d9c,"Filtered Events":#DC4E41}</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div style="height:5px;background-color:#064d6b;margin:0px;"/>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p style="1float:left;font-weight:normal;font-size:260%;color:#ff8737;border:2px solid #323232;padding:16px 20px 14px;border-radius:8px;background-color:#1f1f1f;margin:1px 0px;">
+          Interactive Investigation Panel
+        </p>
+        <p style="float:left;font-weight:normal;font-size:120%;color:#0da8ea;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#1f1f1f;margin:5px 10px 1px 0px">
+          Total / Selected Events: <span style="color:#888888;">$total_events$</span> / <span style="color:#DC4E41;">$filtered_events$</span>
+        </p>                  
+        <p style="float:left;font-weight:normal;font-size:120%;color:#0da8ea;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#1f1f1f;margin:5px 10px 1px 0px">
+          Selected timeframe: <span style="color:#009933;">$selection_earliest$ - $selection_latest$</span>
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    
+    <panel>
+      <input type="text" token="search_vendor_region" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_vendor_regions_spl">if(match('search_vendor_region', "^!"), "NOT ", "") . "All_Changes.vendor_region " . if(match('search_vendor_region', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_vendor_region',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.vendor_region$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_vendor_region',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_vendor_regions">if('search_vendor_region'=="*" OR isnull('search_vendor_region'), "", 'selected_vendor_regions_spl')</eval>
+          <eval token="selected_vendor_regions_spl2">replace('selected_vendor_regions', "^All_Changes\\.", "")</eval>
+          <eval token="vendor_regions_border_css">if('selected_vendor_regions'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$vendor_regions_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_vendor_region&quot;:&quot;*&quot;}" href="#">
+        Vendor Region <span style="color:#009933;">$found_vendor_regions$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by vendor_region
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_vendor_regions"></set>
+          </progress>
+          <done>
+            <eval token="found_vendor_regions">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_vendor_region">"=".'row.vendor_region'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+    
+    <panel>
+      <input type="text" token="search_user" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_users_spl">if(match('search_user', "^!"), "NOT ", "") . "All_Changes.user " . if(match('search_user', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_user',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.user$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_user',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_users">if('search_user'=="*" OR isnull('search_user'), "", 'selected_users_spl')</eval>
+          <eval token="selected_users_spl2">replace('selected_users', "^All_Changes\\.", "")</eval>
+          <eval token="users_border_css">if('selected_users'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$users_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_user&quot;:&quot;*&quot;}" href="#">
+        User <span style="color:#009933;">$found_users$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by user
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_users"></set>
+          </progress>
+          <done>
+            <eval token="found_users">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_user">"=".'row.user'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+    
+    <panel>
+      <input type="text" token="search_user_type" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_user_types_spl">if(match('search_user_type', "^!"), "NOT ", "") . "All_Changes.user_type " . if(match('search_user_type', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_user_type',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.user_type$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_user_type',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_user_types">if('search_user_type'=="*" OR isnull('search_user_type'), "", 'selected_user_types_spl')</eval>
+          <eval token="selected_user_types_spl2">replace('selected_user_types', "^All_Changes\\.", "")</eval>
+          <eval token="user_types_border_css">if('selected_user_types'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$user_types_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_user_type&quot;:&quot;*&quot;}" href="#">
+        User type <span style="color:#009933;">$found_user_types$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by user_type
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_user_types"></set>
+          </progress>
+          <done>
+            <eval token="found_user_types">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_user_type">"=".'row.user_type'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+
+    <panel>
+      <input type="text" token="search_src" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_srcs_spl">if(match('search_src', "^!"), "NOT ", "") . "All_Changes.src " . if(match('search_src', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_src',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.src$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_src',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_srcs">if('search_src'=="*" OR isnull('search_src'), "", 'selected_srcs_spl')</eval>
+          <eval token="selected_srcs_spl2">replace('selected_srcs', "^All_Changes\\.", "")</eval>
+          <eval token="srcs_border_css">if('selected_srcs'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$srcs_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_src&quot;:&quot;*&quot;}" href="#">
+        Source <span style="color:#009933;">$found_srcs$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by src
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_srcs"></set>
+          </progress>
+          <done>
+            <eval token="found_srcs">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_src">"=".'row.src'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+
+    <panel>
+      <input type="text" token="search_dest" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_dests_spl">if(match('search_dest', "^!"), "NOT ", "") . "All_Changes.dest " . if(match('search_dest', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_dest',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.dest$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_dest',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_dests">if('search_dest'=="*" OR isnull('search_dest'), "", 'selected_dests_spl')</eval>
+          <eval token="selected_dests_spl2">replace('selected_dests', "^All_Changes\\.", "")</eval>
+          <eval token="dests_border_css">if('selected_dests'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$dests_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_dest&quot;:&quot;*&quot;}" href="#">
+        Destination <span style="color:#009933;">$found_dests$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by dest
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_dests"></set>
+          </progress>
+          <done>
+            <eval token="found_dests">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_dest">"=".'row.dest'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+
+    <panel>
+      <input type="text" token="search_change_type" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_change_types_spl">if(match('search_change_type', "^!"), "NOT ", "") . "All_Changes.change_type " . if(match('search_change_type', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_change_type',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.change_type$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_change_type',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_change_types">if('search_change_type'=="*" OR isnull('search_change_type'), "", 'selected_change_types_spl')</eval>
+          <eval token="selected_change_types_spl2">replace('selected_change_types', "^All_Changes\\.", "")</eval>
+          <eval token="change_types_border_css">if('selected_change_types'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$change_types_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_change_type&quot;:&quot;*&quot;}" href="#">
+        Change Type <span style="color:#009933;">$found_change_types$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by change_type
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_change_types"></set>
+          </progress>
+          <done>
+            <eval token="found_change_types">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_change_type">"=".'row.change_type'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+    <panel>
+      <input type="text" token="search_command" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_commands_spl">if(match('search_command', "^!"), "NOT ", "") . "All_Changes.command " . if(match('search_command', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_command',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.command$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_command',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_commands">if('search_command'=="*" OR isnull('search_command'), "", 'selected_commands_spl')</eval>
+          <eval token="selected_commands_spl2">replace('selected_commands', "^All_Changes\\.", "")</eval>
+          <eval token="commands_border_css">if('selected_commands'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$commands_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_command&quot;:&quot;*&quot;}" href="#">
+        Command <span style="color:#009933;">$found_commands$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by command
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_commands"></set>
+          </progress>
+          <done>
+            <eval token="found_commands">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_command">"=".'row.command'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+    <panel>
+      <input type="text" token="search_action" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_actions_spl">if(match('search_action', "^!"), "NOT ", "") . "All_Changes.action " . if(match('search_action', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_action',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.action$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_action',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_actions">if('search_action'=="*" OR isnull('search_action'), "", 'selected_actions_spl')</eval>
+          <eval token="selected_actions_spl2">replace('selected_actions', "^All_Changes\\.", "")</eval>
+          <eval token="actions_border_css">if('selected_actions'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$actions_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_action&quot;:&quot;*&quot;}" href="#">
+        Action <span style="color:#009933;">$found_actions$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by action
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_actions"></set>
+          </progress>
+          <done>
+            <eval token="found_actions">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_action">"=".'row.action'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+    <panel>
+      <input type="text" token="search_object" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_objects_spl">if(match('search_object', "^!"), "NOT ", "") . "All_Changes.object " . if(match('search_object', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_object',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.object$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_object',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_objects">if('search_object'=="*" OR isnull('search_object'), "", 'selected_objects_spl')</eval>
+          <eval token="selected_objects_spl2">replace('selected_objects', "^All_Changes\\.", "")</eval>
+          <eval token="objects_border_css">if('selected_objects'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$objects_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_object&quot;:&quot;*&quot;}" href="#">
+        Object <span style="color:#009933;">$found_objects$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by object
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_objects"></set>
+          </progress>
+          <done>
+            <eval token="found_objects">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_object">"=".'row.object'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+
+    <panel>
+      <input type="text" token="search_object_category" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_object_categorys_spl">if(match('search_object_category', "^!"), "NOT ", "") . "All_Changes.object_category " . if(match('search_object_category', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_object_category',"* "), "\\s+([!&lt;&gt;=]+)", " AND All_Changes.object_category$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_object_category',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_object_categorys">if('search_object_category'=="*" OR isnull('search_object_category'), "", 'selected_object_categorys_spl')</eval>
+          <eval token="selected_object_categorys_spl2">replace('selected_object_categorys', "^All_Changes\\.", "")</eval>
+          <eval token="object_categorys_border_css">if('selected_object_categorys'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$object_categorys_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_object_category&quot;:&quot;*&quot;}" href="#">
+        Object category <span style="color:#009933;">$found_object_categorys$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by object_category
+| sort 0 - Events
+            ]]>
+          </query>
+          <progress>
+            <set token="found_object_categorys"></set>
+          </progress>
+          <done>
+            <eval token="found_object_categorys">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_object_category">"=".'row.object_category'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div style="height:5px;background-color:#064d6b;margin:0px;"/>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p style="1float:left;font-weight:normal;font-size:260%;color:#ff8737;border:2px solid #323232;padding:16px 20px 14px;border-radius:8px;background-color:#1f1f1f;margin:1px 0px;">
+          Detailed Changes Activity
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Total events: $total_events2$</title>
+      <input type="dropdown" token="spl_show_results" searchWhenChanged="true">
+        <label>Show results:</label>
+        <choice value="| head 10000">Show max 10,000 events</choice>
+        <choice value="">Show All events</choice>
+        <default></default>
+      </input>
+      <table>
+        <search>
+          <progress>
+            <set token="total_events2">Analyzing ...</set>
+          </progress>
+          <done>
+            <eval token="total_events2">tostring($job.resultCount$,"commas")</eval>
+          </done>
+          <query>| tstats summariesonly=t fillnull_value="---" count as "All Events" FROM datamodel=Change 
+WHERE *
+  $selected_vendor_regions$
+  $selected_users$
+  $selected_user_types$
+  $selected_srcs$
+  $selected_dests$
+  $selected_change_types$
+  $selected_commands$
+  $selected_actions$
+  $selected_objects$
+  $selected_object_categorys$
+BY 
+  All_Changes.vendor_region All_Changes.user All_Changes.user_type All_Changes.src All_Changes.dest All_Changes.change_type All_Changes.command All_Changes.action All_Changes.object All_Changes.object_category _time span=1s
+| rename All_Changes.* as * 
+| search $spl_show_results$
+| table _time vendor_region user user_type src dest change_type command action object object_category
+| sort 0 -_time</query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="user">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="change_type">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="action">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div style="height:5px;background-color:#064d6b;margin:0px;"/>
+      </html>
+    </panel>
+  </row>
+</form>

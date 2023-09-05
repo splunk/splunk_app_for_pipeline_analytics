@@ -1,0 +1,140 @@
+<form theme="dark" version="1.1">
+  <label>DORA Metrics</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="repoTkn" searchWhenChanged="true">
+      <label>Repositories</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>repository.name</fieldForLabel>
+      <fieldForValue>repository.name</fieldForValue>
+      <search>
+        <query>`github_webhooks` eventtype="GitHub::Push"|dedup repository.name| table repository.name</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Average Deployments Per Week</title>
+      <single>
+        <search>
+          <query>| makeresults count=20000
+| streamstats count
+| eval repository_name = "devops_cim"
+| eval _time=_time-(count*3600)
+| eval deployment_count = (random() % 100)+(_time*0.00000009)
+| timechart span=1w avg(deployment_count) by repository_name</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Lead Time To Change</title>
+      <single>
+        <search>
+          <query>| multisearch [|from datamodel:"DevOps_Work.Work_Issues" ] [|from datamodel:"DevOps_Code.DevOps_Commit"  ] [|from datamodel:"DevOps_Code.DevOps_Push"  ] [|from datamodel:"DevOps_Code.DevOps_PullRequest"  ]
+      | search repository_name="*" issueNumber="*"
+| eval openTime=if((action=="opened" AND eventtype="GitHub::Issue"),_time,NULL)
+| eval inProgressTime2=if(action=="labeled",if('issue_tags'=="to do",_time,NULL),if(action=="milestoned",_time,NULL))
+| eval inProgressTime=if(action=="assigned",_time,if('issue_tags'=="to do",_time,if(action=="milestoned",_time,NULL)))
+| eval workTime2=if(action=="labeled",if('issue_tags'="in progress",_time,NULL),if(current_push!="",_time,NULL))
+| eval workTime=if(current_push!="",_time,NULL)
+| eval reviewRequestedTime=if(action=="review_requested",_time,NULL)
+| eval reviewStartTime=if('review.state'!="",_time,NULL)
+| eval reviewTime=if('review.state'!="",_time,NULL)
+| eval mergeTime=if(pr_id!="",if('pull_request.merged'=="true",_time,NULL),NULL)
+``` Doing some fakery here```
+| eval rand = round(((random() % 400)/(400)) * (400 - 120) + 120)
+| eval rand1 = round(((random() % 1200)/(1200)) * (1200 - 440) + 440)
+| eval rand2 = round(((random() % 2900)/(2900)) * (2900 - 965) + 965)
+
+| eval reviewStartTime = if('reviewRequestedTime'!="", reviewRequestedTime+rand, null)
+| eval reviewTime = if(('reviewStartTime'!=""), reviewRequestedTime+rand1, null)
+| eval startTestTime = if(('mergeTime'!=""), mergeTime + rand, null)
+| eval endTestTime = if('mergeTime'!="", mergeTime + rand1, null)
+| eval releaseTime = if('endTestTime'!="", endTestTime+rand2, null)
+| eval testTimeDiff=endTestTime-startTestTime
+``` Fakery Over ```
+| eval sha=after
+| stats max(issue_subject) as 'issue.title', min(openTime) as opened, min(inProgressTime) as in_progress, min(workTime) as earliest_work, max(workTime2) as working, max(mergeTime) as merge, min(reviewTime) as earliest_review, max(reviewTime) as latest_review, min(reviewRequestedTime) as review_requested, min(reviewStartTime) as review_started, avg(testTimeDiff) as avgTestDuration, max(endTestTime) as endTestTime, max(releaseTime) as releaseTime, latest(status_current) as status_current by repository_name,issueNumber
+| search opened=* | eval workingTimeDiff=working-opened | search workingTimeDiff&gt;0 | stats avg(workingTimeDiff) as workingTime | eval workingTime=toString(round(workingTime),"Duration")</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <refresh>10m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="unit">h</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Mean Time to Restore Service (Monthly)</title>
+      <single>
+        <search>
+          <query>| makeresults count=25000
+| streamstats count
+| eval rand = (random() % 400)
+| eval rand1 = (random() % 1400)
+| eval rand2 = (random() % 5400)
+| eval _time=_time-(count*3600)
+| eval outage_time = if(count%rand2=0 OR count%2300=0,(random() % 30)+1, 0)
+
+| eval adjusted_outage_time = ((outage_time)%(_time%999))+1
+| trendline sma120(adjusted_outage_time) as trend
+| timechart span=1week sum(adjusted_outage_time)</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="unit">min</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Change Failure Rate</title>
+      <single>
+        <search>
+          <query>| makeresults count=20000
+| streamstats count
+| eval deployments = (random() % 100) + 1
+| eval repository_name = "devops_cim"
+| eval _time=_time-(count*3600)
+| eval deployment_failures = (random() % 110)
+| eval error_rate=deployment_failures/deployments
+|timechart span=1month avg(error_rate)</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0.000</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">0</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="trendInterval">-1mon</option>
+        <option name="unit">%</option>
+      </single>
+    </panel>
+  </row>
+</form>

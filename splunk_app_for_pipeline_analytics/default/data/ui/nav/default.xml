@@ -1,0 +1,23 @@
+<nav search_view="search">
+  <view name="search" default='true' />
+  <collection label="Development Insights">
+    <view name="issue_analysis" />
+    <view name="workflow_analytics" />
+    <view name="value_stream_analytics" />
+  </collection>
+  <collection label="Security Insights">
+    <view name="repository_risk" />
+    <view name="vuln_analysis" />
+    <view name="changes_analysis" />
+  </collection>
+  <collection label="Production Insights">
+    <view name="dora_metrics" />
+  </collection>
+  <collection label="Splunk System">
+    <view name="datasets" />
+    <view name="reports" />
+    <view name="alerts" />
+    <view name="dashboards" />
+    <view name="analytics_workspace" />
+  </collection>
+</nav>
