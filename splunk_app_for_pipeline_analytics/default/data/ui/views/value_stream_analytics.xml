@@ -1,0 +1,194 @@
+<form version="1.1" theme="dark">
+  <search id="baseSearch">
+    <query>
+      | multisearch [|from datamodel:"DevOps_Work.Work_Issues" ] [|from datamodel:"DevOps_Code.DevOps_Commit"  ] [|from datamodel:"DevOps_Code.DevOps_Push"  ] [|from datamodel:"DevOps_Code.DevOps_PullRequest"  ] [|from datamodel:"DevOps_Release.DevOps_Release"  ]
+      | search repository_name=$repoTkn$ issueNumber=$issueNumber_token$
+| eval openTime=if((isnotnull(submission_date)),_time,NULL)
+```| eval inProgressTime2=if(action=="labeled",if('issue_tags'=="to do",_time,NULL),if(action=="milestoned",_time,NULL))```
+| eval inProgressTime=if(action=="assigned", _time, if('issue_tags'=="to do", _time, if(action=="milestoned", _time , if('issue_assigned_date'!="", _time, NULL))))
+| eval workTime2=if(action=="labeled",if('issue_tags'="in progress",_time,NULL),if(current_push!="",_time,NULL))
+| eval workTime=if(current_push!="",_time,NULL)
+| eval reviewRequestedTime=if((action=="review_requested" OR isnotnull('assigned_reviewers')),_time, NULL)
+| eval reviewStartTime=if('review_state'!="",_time,NULL)
+| eval reviewTime=if('review_state'!="",_time,NULL)
+| eval mergeTime=if(pr_id!="",if('pull_request_merged'=="true",_time,NULL),NULL)
+```| eval releaseTime=if(release_status="published", release_created_at, NULL)```
+``` Doing some fakery here```
+| eval rand = round(((random() % 400)/(400)) * (400 - 120) + 120)
+| eval rand1 = round(((random() % 1200)/(1200)) * (1200 - 440) + 440)
+| eval rand2 = round(((random() % 2900)/(2900)) * (2900 - 965) + 965)
+
+| eval reviewStartTime = if('reviewRequestedTime'!="", reviewRequestedTime+rand, null)
+| eval reviewTime = if(('reviewStartTime'!=""), reviewRequestedTime+rand1, null)
+| eval startTestTime = if(('mergeTime'!=""), mergeTime + rand, null)
+| eval endTestTime = if('mergeTime'!="", mergeTime + rand1, null)
+| eval releaseTime = if('endTestTime'!="", endTestTime+rand2, null)
+| eval testTimeDiff=endTestTime-startTestTime
+``` Fakery Over ```
+| eval sha=after
+| stats max(issue_subject) as 'issue.title', min(openTime) as opened, min(inProgressTime) as in_progress, min(workTime) as earliest_work, max(workTime2) as working, min(reviewTime) as earliest_review, max(reviewTime) as latest_review, min(reviewRequestedTime) as review_requested, min(reviewStartTime) as review_started, avg(testTimeDiff) as avgTestDuration, max(endTestTime) as endTestTime, max(mergeTime) as merge, max(releaseTime) as releaseTime, latest(status_current) as status_current by repository_name,issueNumber
+| search opened=*
+    </query>
+    <earliest>$timeTkn.earliest$</earliest>
+    <latest>$timeTkn.latest$</latest>
+  </search>
+  <label>Value Stream Analytics</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="timeTkn" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="repoTkn">
+      <label>Repositories</label>
+      <fieldForLabel>repository_name</fieldForLabel>
+      <fieldForValue>repository_name</fieldForValue>
+      <search>
+        <query>`devops_index_macro` |dedup repository_name| table repository_name</query>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <delimiter>,</delimiter>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+    <input type="multiselect" token="issueNumber_token">
+      <label>Issue Number</label>
+      <fieldForLabel>issueNumber</fieldForLabel>
+      <fieldForValue>issueNumber</fieldForValue>
+      <search>
+        <query>`devops_index_macro` |dedup issueNumber| table issueNumber</query>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <delimiter>,</delimiter>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total Time</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval totalTimeDiff=if(releaseTime!="", releaseTime, merge)-opened | stats avg(totalTimeDiff) as totalTime | eval totalTime=toString(round(totalTime),"Duration")</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051", "0x0877a6", "0xf8be34", "0xf1813f", "0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 1: Average Time to Accept</title>
+      <single>
+        <search base="baseSearch">
+          <query> | eval acceptTimeDiff=in_progress-opened | stats avg(acceptTimeDiff) as acceptTime | eval acceptTime=toString(round(acceptTime),"Duration")</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Step 2: Average Time to Work</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval workingTimeDiff=working-in_progress | search workingTimeDiff&gt;0 | stats avg(workingTimeDiff) as workingTime | eval workingTime=toString(round(workingTime),"Duration")</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Step 3: Average Time to Review</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval reviewTimeDiff=review_started-review_requested  | search reviewTimeDiff&gt;0 | stats avg(reviewTimeDiff) as reviewTime | eval reviewTime=toString(round(reviewTime),"Duration")</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 4: Average Time to Merge</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval mergeTimeDiff=merge-review_requested | search mergeTimeDiff&gt;0  | stats avg(mergeTimeDiff) as mergeTime | eval mergeTime=toString(round(mergeTime),"Duration")</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Step 5: Average Time to Test</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval testTimeDiff=endTestTime-latest_review | stats avg(testTimeDiff) as testTime | eval testTime=toString(round(testTime),"Duration") </query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Step 6: Average Time to Release</title>
+      <single>
+        <search base="baseSearch">
+          <query>| eval releaseTimeDiff=releaseTime-endTestTime | stats avg(releaseTimeDiff) as releaseTime | eval releaseTime=toString(round(releaseTime),"Duration")</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <search base="baseSearch">
+          <query>| eval acceptTimeDiff=in_progress-opened
+| eval workingTimeDiff=working-in_progress
+| eval reviewTimeDiff=review_started-review_requested
+| eval mergeTimeDiff=merge-review_requested
+| eval testTimeDiff=endTestTime-merge
+| eval releaseTimeDiff=releaseTime-endTestTime
+| eval totalTimeDiff=if(releaseTime!="", releaseTime, merge)-opened
+| eval acceptTime=toString(round(acceptTimeDiff),"Duration"), workingTime=toString(round(workingTimeDiff),"Duration"), mergeTime=toString(round(mergeTimeDiff),"Duration"),reviewTime=toString(round(reviewTimeDiff),"Duration"), testTime=toString(round(endTestTime-latest_review),"Duration"), testDuration=toString(round(avgTestDuration),"Duration"), releaseTime=toString(round(releaseTimeDiff),"Duration"), totalTime=toString(round(totalTimeDiff),"Duration")
+| eval opened=strftime(opened,"%m/%d/%Y %H:%M")
+| fields repository_name, issueNumber, 'issue.title', status_current, opened, acceptTime, workingTime, reviewTime, mergeTime, testTime, testDuration, releaseTime, totalTime, reviewTime</query>
+        </search>
+        <option name="count">25</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

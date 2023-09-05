@@ -1,0 +1,129 @@
+<form version="1.1">
+  <label>DevSecOps Overview</label>
+  <search id="vulnerabity_srch">
+    <query>| pivot Code_Vulnerabilities Vulnerabilities count(Vulnerabilities) AS Total SPLITROW category SPLITROW _time
+| append [ | pivot Code_Vulnerabilities Coding_Vulnerabilities count(Coding_Vulnerabilities) AS Total SPLITROW category SPLITROW _time ]
+| stats sum(Total) as Total by _time,category</query>
+    <earliest>$time_tok.earliest$</earliest>
+    <latest>$time_tok.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <fieldset submitButton="false">
+    <input type="time" token="time_tok" searchWhenChanged="true">
+      <label>Time Period</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <div class="flex flex-column justify-center relative shadow-hover default br2 hide-child">
+        <h1>
+          <i class="fas fa-bullhorn" style="font-size: 34px;color:#FF5733"/>  Sec Metrics</h1>
+        <div style="height:5px;background-color:#0ECE11;margin:0px;"/>
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Dependency Vulnerabilities</title>
+      <single>
+        <search base="vulnerabity_srch">
+          <query>| search category="dependency"
+| timechart minspan=1d sum(Total) as Total</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="trendInterval">-7d</option>
+        <option name="underLabel">Vulnerabilities Detected</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Dependency Vulnerabilities</title>
+      <single>
+        <search base="vulnerabity_srch">
+          <query>| search category="code"
+| timechart minspan=1d sum(Total) as Total</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="trendInterval">-7d</option>
+        <option name="underLabel">Vulnerabilities Detected</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Repositories with High and Low Severity Vulnerabilities</title>
+      <chart>
+        <search>
+          <query>| pivot Code_Vulnerabilities Vulnerabilities count(Vulnerabilities) AS Total SPLITROW category SPLITROW severity SPLITROW signature SPLITROW repository_name SPLITROW organization  
+| append [ | pivot Code_Vulnerabilities Coding_Vulnerabilities count(Coding_Vulnerabilities) AS Total SPLITROW severity SPLITROW signature SPLITROW category SPLITROW repository_name SPLITROW organization ]
+| search severity="critical" OR severity="high"
+| eval repo= organization + "/" + repository_name
+| stats count as total by severity,repo
+| eventstats sum(total) as total_events by repo
+| sort -total_events,repo</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="height">423</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.size">small</option>
+        <option name="trellis.splitBy">repo</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div class="flex flex-column justify-center relative shadow-hover default br2 hide-child">
+        <h1>
+          <i class="fas fa-bullhorn" style="font-size: 34px;color:#FF5733"/>  Operational Metrics</h1>
+        <div style="height:5px;background-color:#0ECE11;margin:0px;"/>
+        </div>
+      </html>
+    </panel>
+  </row>
+</form>

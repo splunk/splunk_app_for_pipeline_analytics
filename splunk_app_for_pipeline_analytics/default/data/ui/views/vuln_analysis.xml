@@ -1,0 +1,739 @@
+<form version="1.1" script="token_buttons.js" theme="dark">
+  <label>Vulnerabilities Analysis</label>
+  <init>
+    <set token="filtered_events">Analyzing ...</set>
+    <set token="total_events">Analyzing ...</set>
+    <set token="total_events2">Analyzing ...</set>
+    <set token="found_categorys"></set>
+    <set token="found_cves"></set>
+    <set token="found_dests"></set>
+    <set token="found_repository_names"></set>
+    <set token="found_signatures"></set>
+    <set token="found_organizations"></set>
+    <set token="found_xrefs"></set>
+    <set token="found_severitys"></set>
+    <set token="selected_categorys"></set>
+    <set token="selected_cves"></set>
+    <set token="selected_dests"></set>
+    <set token="selected_repository_names"></set>
+    <set token="selected_signatures"></set>
+    <set token="selected_organizations"></set>
+    <set token="selected_xrefs"></set>
+    <set token="selected_severitys"></set>
+  </init>
+  <search>
+    <query>
+      <![CDATA[
+| tstats count FROM datamodel=Code_Vulnerabilities WHERE *
+      ]]>
+    </query>
+    <earliest>$timeframe.earliest$</earliest>
+    <latest>$timeframe.latest$</latest>
+    <progress>
+      <set token="total_events">Analyzing ...</set>
+    </progress>
+    <done>
+      <eval token="total_events">tostring($result.count$,"commas")</eval>
+    </done>
+  </search>
+  <search>
+    <query>
+      <![CDATA[
+| tstats count FROM datamodel=Code_Vulnerabilities
+  WHERE *
+  $selected_categorys$
+  $selected_cves$
+  $selected_dests$
+  $selected_repository_names$
+  $selected_signatures$
+  $selected_organizations$
+  $selected_xrefs$
+  $selected_severitys$
+      ]]>
+    </query>
+    <earliest>$selection.earliest$</earliest>
+    <latest>$selection.latest$</latest>
+    <progress>
+      <set token="filtered_events">Analyzing ...</set>
+    </progress>
+    <done>
+      <eval token="filtered_events">tostring($result.count$,"commas")</eval>
+    </done>
+  </search>
+  <!-- ========================================================================================================================= -->
+  <search id="base_mt">
+    <query>
+      <![CDATA[
+| tstats c fillnull_value="---"
+  FROM datamodel=Code_Vulnerabilities
+  WHERE *
+  $selected_categorys$
+  $selected_cves$
+  $selected_dests$
+  $selected_repository_names$
+  $selected_signatures$
+  $selected_organizations$
+  $selected_xrefs$
+  $selected_severitys$
+  BY Vulnerabilities.category Vulnerabilities.cve Vulnerabilities.dest Vulnerabilities.repository_name Vulnerabilities.signature Vulnerabilities.organization Vulnerabilities.xref Vulnerabilities.severity 
+| rename Vulnerabilities.* as * 
+| append [ | pivot Code_Vulnerabilities Coding_Vulnerabilities count(Coding_Vulnerabilities) AS "Count of Coding Vulnerabilities" SPLITROW category SPLITROW dest SPLITROW repository_name SPLITROW signature SPLITROW organization SPLITROW xref SPLITROW severity | stats count as c by category, dest, repository_name, signature, organization ] 
+| eventstats sum(c) as _count
+| fields *
+      ]]>
+    </query>
+    <earliest>$selection.earliest$</earliest>
+    <latest>$selection.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <!-- ========================================================================================================================= -->
+  <fieldset submitButton="false">
+    <input type="time" token="timeframe" searchWhenChanged="true">
+      <label>Select timeframe:</label>
+      <default>
+        <earliest>-6mon@mon</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <div>
+          <a style="float:left;font-weight:normal;font-size:120%;color:#dc4e41;border:1px solid #dc4e41;padding:2px 12px 1px; border-radius:8px;background-color:#4e1c17;margin:1px 10px 1px 0;" href="/app/$env:app$/$env:page$">Reset Dashboard</a>
+          <a style="display:none;float:left;font-weight:normal;font-size:120%;color:#dddd66;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#43431f;margin:1px 10px 1px 0;" type="button" data-token-json="{&quot;form.ad_hoc_search_spl&quot;:&quot;*&quot;,&quot;form.find_user_id&quot;:&quot;*&quot;,&quot;form.selected_user_id&quot;:&quot;*&quot;}" href="#">
+          Clear Search Filters
+          </a>          
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Combined Timechart of all events ($total_events$):</title>
+      <chart>
+        <search>
+          <query>| tstats  c as "All Events" FROM datamodel=Code_Vulnerabilities BY _time span=12h Vulnerabilities.category
+| rename Vulnerabilities.* as *
+| append [ | pivot Code_Vulnerabilities Coding_Vulnerabilities count(Coding_Vulnerabilities) AS "All Events" SPLITROW category SPLITROW _time ] 
+| timechart span=12h sum("All Events") as "All Events" by category</query>
+          <earliest>$timeframe.earliest$</earliest>
+          <latest>$timeframe.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <selection>
+          <eval token="selection.earliest">if(isnum($start$) AND isnum($end$), $start$, $timeframe.earliest$)</eval>
+          <eval token="selection.latest">if(isnum($start$) AND isnum($end$), $end$, $timeframe.latest$)</eval>
+          <eval token="selection_earliest">strftime('selection.earliest', "%Y-%m-%d %H:%M:%S")</eval>
+          <eval token="selection_latest">strftime('selection.latest', "%Y-%m-%d %H:%M:%S")</eval>
+        </selection>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">Events</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"All Events":#888888}</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Filtered Events ($filtered_events$):</title>
+      <chart>
+        <search>
+          <query>
+            <![CDATA[
+| tstats  c as "Filtered Events" FROM datamodel=Code_Vulnerabilities
+  WHERE *
+  $selected_categorys$
+  $selected_cves$
+  $selected_dests$
+  $selected_repository_names$
+  $selected_signatures$
+  $selected_organizations$
+  $selected_xrefs$
+  $selected_severitys$
+  BY _time span=12h Vulnerabilities.category
+| rename Vulnerabilities.* as *
+| timechart span=12h sum("Filtered Events") as "Filtered Events"
+            ]]>
+          </query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <selection></selection>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"All Events":#006d9c,"Filtered Events":#DC4E41}</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div style="height:5px;background-color:#064d6b;margin:0px;"/>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p style="1float:left;font-weight:normal;font-size:260%;color:#ff8737;border:2px solid #323232;padding:16px 20px 14px;border-radius:8px;background-color:#1f1f1f;margin:1px 0px;">
+          Interactive Investigation Panel
+        </p>
+        <p style="float:left;font-weight:normal;font-size:120%;color:#0da8ea;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#1f1f1f;margin:5px 10px 1px 0px">
+          Total / Selected Events: <span style="color:#888888;">$total_events$</span> / <span style="color:#DC4E41;">$filtered_events$</span>
+        </p>                  
+        <p style="float:left;font-weight:normal;font-size:120%;color:#0da8ea;border:1px solid #737373;padding:2px 12px 1px;border-radius:8px;background-color:#1f1f1f;margin:5px 10px 1px 0px">
+          Selected timeframe: <span style="color:#009933;">$selection_earliest$ - $selection_latest$</span>
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="text" token="search_category" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_categorys_spl">if(match('search_category', "^!"), "NOT ", "") . "Vulnerabilities.category " . if(match('search_category', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_category',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.category$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_category',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_categorys">if('search_category'=="*" OR isnull('search_category'), "", 'selected_categorys_spl')</eval>
+          <eval token="selected_categorys_spl2">replace('selected_categorys', "^Vulnerabilities\\.", "")</eval>
+          <eval token="categorys_border_css">if('selected_categorys'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$categorys_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_category&quot;:&quot;*&quot;}" href="#">
+        Category <span style="color:#009933;">$found_categorys$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <progress>
+            <set token="found_categorys"></set>
+          </progress>
+          <done>
+            <eval token="found_categorys">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+          <query>| stats sum(c) as Events by category
+| sort 0 - Events
+| table Events *</query>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_category">"=".'row.category'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_severity" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_severitys_spl">if(match('search_severity', "^!"), "NOT ", "") . "Vulnerabilities.severity " . if(match('search_severity', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_severity',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.severity$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_severity',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_severitys">if('search_severity'=="*" OR isnull('search_severity'), "", 'selected_severitys_spl')</eval>
+          <eval token="selected_severitys_spl2">replace('selected_severitys', "^Vulnerabilities\\.", "")</eval>
+          <eval token="severitys_border_css">if('selected_severitys'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$severitys_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_severity&quot;:&quot;*&quot;}" href="#">
+        Severity <span style="color:#009933;">$found_severitys$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <progress>
+            <set token="found_severitys"></set>
+          </progress>
+          <done>
+            <eval token="found_severitys">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+          <query>| stats sum(c) as Events by severity
+| sort 0 - Events
+| table Events *</query>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"low":#53A051,"moderate":#F8BE34,"high":#F1813F,"critical":#DC4E41,"unknown":#708794}</colorPalette>
+        </format>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_severity">"=".'row.severity'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_organization" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_organizations_spl">if(match('search_organization', "^!"), "NOT ", "") . "Vulnerabilities.organization " . if(match('search_organization', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_organization',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.organization$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_organization',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_organizations">if('search_organization'=="*" OR isnull('search_organization'), "", 'selected_organizations_spl')</eval>
+          <eval token="selected_organizations_spl2">replace('selected_organizations', "^Vulnerabilities\\.", "")</eval>
+          <eval token="organizations_border_css">if('selected_organizations'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$organizations_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_organization&quot;:&quot;*&quot;}" href="#">
+        Organization <span style="color:#009933;">$found_organizations$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by organization
+| sort 0 - Events
+| table Events *
+            ]]>
+          </query>
+          <progress>
+            <set token="found_organizations"></set>
+          </progress>
+          <done>
+            <eval token="found_organizations">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_organization">"=".'row.organization'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_cve" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_cves_spl">if(match('search_cve', "^!"), "NOT ", "") . "Vulnerabilities.cve " . if(match('search_cve', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_cve',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.cve$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_cve',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_cves">if('search_cve'=="*" OR isnull('search_cve'), "", 'selected_cves_spl')</eval>
+          <eval token="selected_cves_spl2">replace('selected_cves', "^Vulnerabilities\\.", "")</eval>
+          <eval token="cves_border_css">if('selected_cves'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$cves_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_cve&quot;:&quot;*&quot;}" href="#">
+        CVE <span style="color:#009933;">$found_cves$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <progress>
+            <set token="found_cves"></set>
+          </progress>
+          <done>
+            <eval token="found_cves">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+          <query>| stats sum(c) as Events values(severity) as severity by cve
+| sort 0 - Events
+| table Events severity *</query>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"low":#53A051,"moderate":#F8BE34,"high":#F1813F,"critical":#DC4E41,"unknown":#708794}</colorPalette>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_cve">"=".'row.cve'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_dest" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_dests_spl">if(match('search_dest', "^!"), "NOT ", "") . "Vulnerabilities.dest " . if(match('search_dest', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_dest',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.dest$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_dest',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_dests">if('search_dest'=="*" OR isnull('search_dest'), "", 'selected_dests_spl')</eval>
+          <eval token="selected_dests_spl2">replace('selected_dests', "^Vulnerabilities\\.", "")</eval>
+          <eval token="dests_border_css">if('selected_dests'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$dests_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_dest&quot;:&quot;*&quot;}" href="#">
+        Dest <span style="color:#009933;">$found_dests$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <progress>
+            <set token="found_dests"></set>
+          </progress>
+          <done>
+            <eval token="found_dests">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+          <query>| stats sum(c) as Events by dest
+| sort 0 - Events
+| table Events *</query>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_dest">"=".'row.dest'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_repository_name" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_repository_names_spl">if(match('search_repository_name', "^!"), "NOT ", "") . "Vulnerabilities.repository_name " . if(match('search_repository_name', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_repository_name',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.repository_name$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_repository_name',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_repository_names">if('search_repository_name'=="*" OR isnull('search_repository_name'), "", 'selected_repository_names_spl')</eval>
+          <eval token="selected_repository_names_spl2">replace('selected_repository_names', "^Vulnerabilities\\.", "")</eval>
+          <eval token="repository_names_border_css">if('selected_repository_names'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$repository_names_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_repository_name&quot;:&quot;*&quot;}" href="#">
+        Repo Name <span style="color:#009933;">$found_repository_names$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by repository_name
+| sort 0 - Events
+| table Events *
+            ]]>
+          </query>
+          <progress>
+            <set token="found_repository_names"></set>
+          </progress>
+          <done>
+            <eval token="found_repository_names">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_repository_name">"=".'row.repository_name'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_signature" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_signatures_spl">if(match('search_signature', "^!"), "NOT ", "") . "Vulnerabilities.signature " . if(match('search_signature', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_signature',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.signature$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_signature',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_signatures">if('search_signature'=="*" OR isnull('search_signature'), "", 'selected_signatures_spl')</eval>
+          <eval token="selected_signatures_spl2">replace('selected_signatures', "^Vulnerabilities\\.", "")</eval>
+          <eval token="signatures_border_css">if('selected_signatures'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$signatures_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_signature&quot;:&quot;*&quot;}" href="#">
+        Signature <span style="color:#009933;">$found_signatures$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events, first(severity) as severity by signature
+| sort 0 - Events
+| table Events *
+            ]]>
+          </query>
+          <progress>
+            <set token="found_signatures"></set>
+          </progress>
+          <done>
+            <eval token="found_signatures">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"low":#53A051,"moderate":#F8BE34,"high":#F1813F,"critical":#DC4E41,"unknown":#708794}</colorPalette>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_signature">"=".'row.signature'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <input type="text" token="search_xref" searchWhenChanged="true">
+        <label></label>
+        <default>*</default>
+        <change>
+          <eval token="selected_xrefs_spl">if(match('search_xref', "^!"), "NOT ", "") . "Vulnerabilities.xref " . if(match('search_xref', "^\\*?[&lt;&gt;]"), replace(replace(trim('search_xref',"* "), "\\s+([!&lt;&gt;=]+)", " AND Vulnerabilities.xref$1"), "\\s+(OR|or|\\|)\\s+AND\\s+", " OR "), " IN (\"" . replace(trim(replace(replace("|".trim('search_xref',"!*")."|", "([\\|])([^=][^\\|\"]+)", "$1*$2*"), "\\|=", "|"), "|"), "\\|", "\", \"") . "\")"</eval>
+          <eval token="selected_xrefs">if('search_xref'=="*" OR isnull('search_xref'), "", 'selected_xrefs_spl')</eval>
+          <eval token="selected_xrefs_spl2">replace('selected_xrefs', "^Vulnerabilities\\.", "")</eval>
+          <eval token="xrefs_border_css">if('selected_xrefs'=="", "1px solid #643313", "3px solid #ff442d")</eval>
+        </change>
+      </input>
+      <html>
+        <a style="float:left;font-weight:normal;font-size:160%;color:#f57e2f;border:$xrefs_border_css$;padding:8px 14px 6px;border-radius:12px;background-color:#1f1f1f;margin:0 0 0 0px;" type="button" data-token-json="{&quot;form.search_xref&quot;:&quot;*&quot;}" href="#">
+        Xref <span style="color:#009933;">$found_xrefs$</span>
+        </a>                  
+      </html>
+      <table>
+        <search base="base_mt">
+          <query>
+            <![CDATA[
+| stats sum(c) as Events by xref
+| sort 0 - Events
+| table Events *
+            ]]>
+          </query>
+          <progress>
+            <set token="found_xrefs"></set>
+          </progress>
+          <done>
+            <eval token="found_xrefs">"(" . tostring($job.resultCount$,"commas") . ")"</eval>
+          </done>
+        </search>
+        <option name="count">15</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="Events">
+          <colorPalette type="minMidMax" maxColor="#AF575A" minColor="#3C444D"></colorPalette>
+          <scale type="minMidMax"></scale>
+        </format>
+        <drilldown>
+          <condition>
+            <eval token="form.search_xref">"=".'row.xref'</eval>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p style="1float:left;font-weight:normal;font-size:260%;color:#ff8737;border:2px solid #323232;padding:16px 20px 14px;border-radius:8px;background-color:#1f1f1f;margin:1px 0px;">
+          Detailed Vulnerabilities Table
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Total events: $total_events2$</title>
+      <input type="dropdown" token="spl_show_results" searchWhenChanged="true">
+        <label>Show results:</label>
+        <choice value="| head 10000">Show max 10,000 events</choice>
+        <choice value="">Show All events</choice>
+        <default>| head 10000</default>
+      </input>
+      <table>
+        <search>
+          <progress>
+            <set token="total_events2">Analyzing ...</set>
+          </progress>
+          <done>
+            <eval token="total_events2">tostring($job.resultCount$,"commas")</eval>
+          </done>
+          <query>| from datamodel:Code_Vulnerabilities
+| search 
+
+  $selected_categorys_spl2$
+  $selected_cves_spl2$
+  $selected_dests_spl2$
+  $selected_repository_names_spl2$
+  $selected_signatures_spl2$
+  $selected_organizations_spl2$
+  $selected_xrefs_spl2$
+  $selected_severitys_spl2$
+
+$spl_show_results$
+| append [ | pivot Code_Vulnerabilities Coding_Vulnerabilities count(Coding_Vulnerabilities) AS "Count of Coding Vulnerabilities" SPLITROW category SPLITROW dest SPLITROW repository_name SPLITROW signature SPLITROW organization SPLITROW xref SPLITROW severity SPLITROW _time  | eval cve="---"]
+| table _time category severity organization cve dest repository_name signature xref</query>
+          <earliest>$selection.earliest$</earliest>
+          <latest>$selection.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="category">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="cve">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="dest">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="repository_name">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="xref">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"low":#53A051,"moderate":#F8BE34,"high":#F1813F,"critical":#DC4E41,"unknown":#708794}</colorPalette>
+        </format>
+        <format type="color" field="organization">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <div style="height:5px;background-color:#064d6b;margin:0px;"/>
+      </html>
+    </panel>
+  </row>
+</form>
