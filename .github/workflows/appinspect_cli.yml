@@ -49,6 +49,8 @@ jobs:
           new_str="1.0.0"
           sed -i "s/$old_str/$new_str/g" package.json
           sed -i "s/$old_str/$new_str/g" ./${{ vars.appName }}/default/app.conf
+          cat package.json
+          cat ./${{ vars.appName }}/default/app.conf
 
       - name: Install slim
         run: |
