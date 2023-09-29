@@ -24,9 +24,9 @@ jobs:
                 old_str="X.Y.Z"
                 new_str=$(echo "${GITHUB_REF#refs/*/}" | tr -d "v")
                 sed -i "s/$old_str/$new_str/g" package.json
-                sed -i "s/$old_str/$new_str/g" ./splunk_app_for_devsecops/default/app.conf
+                sed -i "s/$old_str/$new_str/g" ./${{ vars.appName }}/default/app.conf
                 cat package.json
-                cat ./splunk_app_for_devsecops/default/app.conf
+                cat ./${{ vars.appName }}/default/app.conf
             - name: Install dependencies
               run: yarn install
               env:
@@ -34,14 +34,14 @@ jobs:
             - name: Build app package
               run: |
                   yarn package
-                  mv dist/*.spl dist/splunk_app_for_devsecops.spl
+                  mv dist/*.spl dist/${{ vars.appName }}.spl
             - uses: actions/upload-artifact@v1
               with:
                   name: app-package
-                  path: dist/splunk_app_for_devsecops.spl
+                  path: dist/${{ vars.appName }}.spl
             - uses: ./.github/actions/appinspect_api
               with:
-                  filePath: ./dist/splunk_app_for_devsecops.spl
+                  filePath: ./dist/${{ vars.appName }}.spl
                   splunkUser: ${{ secrets.SPLUNKBASE_USER }}
                   splunkPassword: ${{ secrets.SPLUNKBASE_PASSWORD }}
                   includedTags: cloud
@@ -49,5 +49,5 @@ jobs:
               uses: fnkr/github-action-ghr@v1
               if: startsWith(github.ref, 'refs/tags/')
               env:
-                  GHR_PATH: ./dist/splunk_app_for_devsecops.spl
+                  GHR_PATH: ./dist/${{ vars.appName }}.spl
                   GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
