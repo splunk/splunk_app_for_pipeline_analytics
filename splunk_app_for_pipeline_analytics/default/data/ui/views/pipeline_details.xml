@@ -1,0 +1,207 @@
+<form version="1.1" script="tabs.js,workflowdetails.js" stylesheet="tabs.css,custom.css" theme="dark">
+  <label>Workflow Details</label>
+  <search id="buildTrends">
+    <query>
+      | datamodel DevOps_Pipelines Pipelines search | search Pipelines.repository_name="$repoName$" Pipelines.name="$workflowName$" 
+    </query>
+    <earliest>$timeRange.earliest$</earliest>
+    <latest>$timeRange.latest$</latest>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="text" token="repoName" searchWhenChanged="true">
+      <label>Repository</label>
+      <default>*</default>
+    </input>
+    <input type="text" token="workflowName" searchWhenChanged="true">
+      <label>Workflow Name</label>
+      <default>*</default>
+    </input>
+    <input type="text" searchWhenChanged="true" token="workflow_id">
+      <label>Run ID</label>
+    </input>
+    <input type="time" token="timeRange" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row id="tabs">
+    <panel>
+      <html>
+        <ul id="tabs" class="nav nav-tabs">
+          <li class="active">
+            <a href="" class="toggle-tab" data-toggle="tab" data-elements="tab_buildDetails1,tab_buildDetails2">Workflow Run Info</a>
+          </li>
+          <li>
+            <a href="" class="toggle-tab" data-toggle="tab" data-elements="tab_buildTrends1,tab_buildTrends2,tab_buildTrends3">Workflow Trends</a>
+          </li>
+          <li>
+            <a href="" class="toggle-tab" data-toggle="tab" data-elements="tab_buildLogs">Workflow Logs</a>
+          </li>
+        </ul>
+      </html>
+    </panel>
+  </row>
+  <row id="tab_buildTrends1">
+    <panel>
+      <title>Build Duration History</title>
+      <chart>
+        <search base="buildTrends">
+          <query>| eval started=if('Pipelines.status'=="queued",_time,null), completed=if('Pipelines.status'=="completed",_time,null) | stats latest(started) as started, latest(completed) as completed, latest(Pipelines.result) as result by Pipelines.run_id | eval duration=completed-started | rename Pipelines.run_id AS "Run ID" | sort started | fields - started, completed, result</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row id="tab_buildTrends2">
+    <panel>
+      <title>Build Status History</title>
+      <chart>
+        <search base="buildTrends">
+          <query>| eval failed=if('Pipelines.result'=="failure",1,0), successful=if('Pipelines.result'=="success",1,0) | stats  latest(_time) as _time, max(successful) as successful, max(failed) as failed, latest(Pipelines.result) as conclusion by Pipelines.repository_name,Pipelines.name,Pipelines.id | table _time, Pipelines.id, successful,failed | sort -_time | head 25 | sort _time | rename Pipelines.id AS "Run ID" | fields - _time</query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row id="tab_buildTrends3">
+    <panel>
+      <title>Build Status Overview</title>
+      <chart>
+        <search base="buildTrends">
+          <query>| eval started=if('Pipelines.status'=="queued",_time,null), completed=if('Pipelines.status'=="completed",_time,null) | stats latest(started) as started, latest(completed) as completed, latest(Pipelines.result) as result by Pipelines.run_id | stats count by result</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row id="tab_buildDetails1">
+    <panel>
+      <table>
+        <title>Workflow Information</title>
+        <search>
+          <query>| datamodel DevOps_Pipelines Pipelines search | search Pipelines.repository_name="$repoName$" Pipelines.name="$workflowName$" Pipelines.id="$workflow_id$" 
+| stats latest(Pipelines.name) as Name, latest(Pipelines.organization) as Organization, latest(Pipelines.repository_name) as Repository, latest(Pipelines.result) as Result, latest(Pipelines.id) as ID, latest(Pipelines.run_number) as "Run Number", latest(Pipelines.attempt_number) as "Attempt Number", earliest(_time) as Started, latest(_time) as Completed, latest(Pipelines.branch) as Branch 
+| eval Duration=toString(Completed-Started, "Duration"), Started=strftime(Started,"%m/%d/%Y %H:%M:%S"), Completed=strftime(Completed,"%m/%d/%Y %H:%M:%S")
+| transpose |rename column AS Details| rename "row 1" AS values</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">https://github.com/$repoName|n$/actions/runs/$workflow_id$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row id="tab_buildDetails2">
+    <panel>
+      <html>
+        <table style="width:100%">
+          <tr>
+            <td>
+              <h3>Workflow Jobs</h3>
+              <div id="table-customrow"/>
+            </td>
+          </tr>
+        </table>
+      </html>
+    </panel>
+  </row>
+  <row id="tab_buildLogs">
+    <panel>
+      <title>Workflow Run Logs</title>
+      <event>
+        <search>
+          <query>`github_workflow_logs` workflowID::$workflow_id$ | sort _time</query>
+          <earliest>0</earliest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="list.drilldown">full</option>
+        <option name="list.wrap">1</option>
+        <option name="maxLines">5</option>
+        <option name="raw.drilldown">none</option>
+        <option name="rowNumbers">0</option>
+        <option name="table.drilldown">all</option>
+        <option name="table.sortDirection">asc</option>
+        <option name="table.wrap">1</option>
+        <option name="type">raw</option>
+      </event>
+    </panel>
+  </row>
+</form>

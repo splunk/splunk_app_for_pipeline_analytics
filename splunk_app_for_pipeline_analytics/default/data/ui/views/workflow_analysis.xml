@@ -1,5 +1,5 @@
 <form version="1.1" script="dm_workflow_table.js" stylesheet="custom.css" theme="dark">
-  <label>Workflow Analysis</label>
+  <label>Pipeline Analysis</label>
   <fieldset submitButton="false" autoRun="true">
     <input type="time" token="timeTkn">
       <label></label>
@@ -28,7 +28,7 @@
       <chart>
         <title>Workflow Conclusions Over Time</title>
         <search>
-          <query>| datamodel DevOps_Pipelines Pipelines flat | search repository_name="$repos$" | stats latest(_time) as _time, latest(result) as result by repository_name,name,run_id | timechart count by result span=1h | rename null as "in-progress"</query>
+          <query>| datamodel DevOps_Pipelines Pipelines flat | search repository_name="$repos$" | eval result=if(result=="failed","failure",result) | stats latest(_time) as _time, latest(result) as result by repository_name,name,run_id | timechart count by result span=1h</query>
           <earliest>$timeTkn.earliest$</earliest>
           <latest>$timeTkn.latest$</latest>
           <sampleRatio>1</sampleRatio>

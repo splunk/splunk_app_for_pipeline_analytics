@@ -1,0 +1,79 @@
+<form version="1.1" theme="dark">
+  <label>Pipeline Overview</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="timeTkn">
+      <label></label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="repoTkn">
+      <label>Repositories</label>
+      <fieldForLabel>repository.name</fieldForLabel>
+      <fieldForValue>repository.name</fieldForValue>
+      <search>
+        <query>`github_webhooks` eventtype="GitHub::Workflow"|dedup repository.name| table repository.name</query>
+        <earliest>$timeTkn.earliest$</earliest>
+        <latest>$timeTkn.latest$</latest>
+      </search>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <delimiter>,</delimiter>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Average Pipeline Overview</title>
+      <single>
+        <search>
+          <query>| tstats c as "All Events" FROM datamodel=DevOps_Pipelines BY Pipelines.repository_organization, Pipelines.repository_name, Pipelines.id,Pipelines.name, Pipelines.result, Pipelines.created, Pipelines.started, Pipelines.completed | eval Queued='Pipelines.started'-'Pipelines.created',Running='Pipelines.completed'-'Pipelines.started', Total='Pipelines.completed'-'Pipelines.created', Repository=('Pipelines.repository_organization'+"/"+'Pipelines.repository_name') | stats avg(Queued) as Queued, avg(Running) as Running, avg(Total) as Total | eval Queued=round(Queued, 2),  Running=round(Running, 2), Total=round(Total, 2) | eval Queued=toString(Queued, "Duration"), Running=toString(Running, "Duration"), Total=toString(Total, "Duration")</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">large</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Pipeline Analytics by Name</title>
+      <table>
+        <search>
+          <query>`github_webhooks` eventtype="GitHub::Workflow" repository.name IN("$repoTkn$") | eval queued=if('workflow_run.status'="queued",_time,NULL), started=if('workflow_run.status'="in_progress",_time,queued),completed=if('workflow_run.status'="completed",_time,NULL) | stats min(queued) as queued, min(started) as started, min(completed) as completed by repository.full_name,workflow_run.name,workflow_run.id | eval queueTime=started-queued, runTime=completed-started, totalTime=completed-queued | fields repository.full_name,workflow_run.name, workflow_run.id, queueTime, runTime, totalTime | stats avg(queueTime) as queueTime, avg(runTime) as runTime, avg(totalTime) as totalTime by repository.full_name,workflow_run.name | eval queueTime=toString(round(queueTime),"Duration"), runTime=toString(round(runTime),"Duration"),totalTime=toString(round(totalTime),"Duration")</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

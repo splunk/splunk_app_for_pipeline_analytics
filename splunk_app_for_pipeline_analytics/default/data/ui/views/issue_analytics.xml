@@ -1,0 +1,77 @@
+<form version="1.1" theme="dark">
+  <label>Issue Analytics</label>
+  <fieldset submitButton="false">
+    <input type="time" token="timeTkn">
+      <label></label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="repoTkn">
+      <label>Repositories</label>
+      <fieldForLabel>repository_name</fieldForLabel>
+      <fieldForValue>repository_name</fieldForValue>
+      <search>
+        <query>| datamodel DevOps_Work Work_Issues flat |dedup repository_name| table repository_name</query>
+        <earliest>$timeTkn.earliest$</earliest>
+        <latest>$timeTkn.latest$</latest>
+      </search>
+      <choice value="*">All</choice>
+      <delimiter> </delimiter>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Issue Count by Status</title>
+        <search>
+          <query>| datamodel DevOps_Work Work_Issues search | stats count by Work_Issues.status_current</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Issue Count by Worker</title>
+        <search>
+          <query>| datamodel DevOps_Work Work_Issues search | stats count by Work_Issues.commit_username</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <single>
+        <title>Average Duration</title>
+        <search>
+          <query>| datamodel DevOps_Work Work_Issues search | stats latest(Work_Issues.status_current) as status, latest(Work_Issues.issue_subject) as subject, latest(Work_Issues.assigned_user) as assigned_user, earliest(_time) as started, latest(_time) as lastUpdate by Work_Issues.issueNumber, Work_Issues.repository_name | eval duration=lastUpdate-started
+| stats avg(duration) as duration | eval duration=round(duration, 2), duration=toString(duration,"Duration")</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Work Items</title>
+        <search>
+          <query>| datamodel DevOps_Work Work_Issues search | stats latest(Work_Issues.status_current) as status, latest(Work_Issues.issue_subject) as subject, latest(Work_Issues.assigned_user) as assigned_user, earliest(_time) as started, latest(_time) as lastUpdate by Work_Issues.issueNumber, Work_Issues.repository_name | eval duration=toString(lastUpdate-started,"Duration") 
+| rename Work_Issues.issueNumber as issueNumber, Work_Issues.repository_name as repository | fields - lastUpdate,started</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+</form>
