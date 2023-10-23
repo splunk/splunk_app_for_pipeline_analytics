@@ -48,7 +48,9 @@ jobs:
           old_str="X.Y.Z"
           new_str="1.0.0"
           sed -i "s/$old_str/$new_str/g" package.json
-          sed -i "s/$old_str/$new_str/g" ./splunk_app_for_devsecops/default/app.conf
+          sed -i "s/$old_str/$new_str/g" ./${{ vars.appName }}/default/app.conf
+          cat package.json
+          cat ./${{ vars.appName }}/default/app.conf
 
       - name: Install slim
         run: |
@@ -57,16 +59,16 @@ jobs:
       - name: Create package
         run: |
           mkdir build
-          slim package ./splunk_app_for_devsecops
+          slim package ./${{ vars.appName }}
 
       - name: Run App Inspect CLI
         uses: splunk/appinspect-cli-action@v1.5
         with:
-          app_path: splunk_app_for_devsecops-1.0.0.tar.gz
+          app_path: ${{ vars.appName }}-1.0.0.tar.gz
           included_tags: cloud, splunk_appinspect
 
       - name: Upload package
         uses: actions/upload-artifact@v3
         with:
-          name: splunk_app_for_devsecops-1.0.0.tar.gz
-          path: ./splunk_app_for_devsecops-1.0.0.tar.gz
+          name: ${{ vars.appName }}-1.0.0.tar.gz
+          path: ./${{ vars.appName }}-1.0.0.tar.gz
