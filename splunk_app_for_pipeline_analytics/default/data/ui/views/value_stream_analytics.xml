@@ -176,7 +176,7 @@
 | eval testTimeDiff=endTestTime-merge
 | eval releaseTimeDiff=releaseTime-endTestTime
 | eval totalTimeDiff=if(releaseTime!="", releaseTime, merge)-opened
-| eval acceptTime=toString(round(acceptTimeDiff),"Duration"), workingTime=toString(round(workingTimeDiff),"Duration"), mergeTime=toString(round(mergeTimeDiff),"Duration"),reviewTime=toString(round(reviewTimeDiff),"Duration"), testTime=toString(round(endTestTime-latest_review),"Duration"), testDuration=toString(round(avgTestDuration),"Duration"), releaseTime=toString(round(releaseTimeDiff),"Duration"), totalTime=toString(round(totalTimeDiff),"Duration")
+| eval acceptTime=toString(round(acceptTimeDiff),"Duration"), workingTime=toString(round(workingTimeDiff),"Duration"), mergeTime=toString(round(mergeTimeDiff),"Duration"),reviewTime=toString(round(reviewTimeDiff),"Duration"), testTime=toString(round((endTestTime+1)-latest_review),"Duration"), testDuration=toString(round(avgTestDuration),"Duration"), releaseTime=toString(round(releaseTimeDiff),"Duration"), totalTime=toString(round(totalTimeDiff),"Duration")
 | eval opened=strftime(opened,"%m/%d/%Y %H:%M")
 | fields repository_name, issueNumber, 'issue.title', status_current, opened, acceptTime, workingTime, reviewTime, mergeTime, testTime, testDuration, releaseTime, totalTime, reviewTime</query>
         </search>

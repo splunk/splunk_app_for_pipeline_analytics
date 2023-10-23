@@ -1,0 +1,144 @@
+<form version="1.1" theme="dark">
+  <label>Commit Activity</label>
+  <fieldset submitButton="false">
+    <input type="time" token="timeTkn">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="orgTkn" searchWhenChanged="true">
+      <label>Organization</label>
+      <choice value="*">All</choice>
+      <initialValue>*</initialValue>
+      <fieldForLabel>repository_organization</fieldForLabel>
+      <fieldForValue>repository_organization</fieldForValue>
+      <search>
+        <query>| datamodel DevOps_Code DevOps_Commit flat | dedup repository_organization | table repository_organization</query>
+        <earliest>$timeTkn.earliest$</earliest>
+        <latest>$timeTkn.latest$</latest>
+      </search>
+      <delimiter> ,</delimiter>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+    <input type="multiselect" token="repoTkn" searchWhenChanged="true">
+      <label>Repositories</label>
+      <choice value="*">All</choice>
+      <initialValue>*</initialValue>
+      <fieldForLabel>repository_name</fieldForLabel>
+      <fieldForValue>repository_name</fieldForValue>
+      <search>
+        <query>| datamodel DevOps_Code DevOps_Commit flat | search repository_organization IN ($orgTkn$) | dedup repository_name | table repository_name</query>
+        <earliest>$timeTkn.earliest$</earliest>
+        <latest>$timeTkn.latest$</latest>
+      </search>
+      <delimiter> ,</delimiter>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Average Per Push</title>
+      <single>
+        <search>
+          <query>| datamodel DevOps_Code DevOps_Push flat | search repository_organization IN ($orgTkn$) repository_name IN ($repoTkn$) | stats count(commits_list) as count, count(commits_author_list) as authors by repository_organization, repository_name, current_push | stats avg(count) as count, avg(authors) as authors | eval count=round(count), authors=round(authors)</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.size">large</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Issue Link Ratio</title>
+      <single>
+        <search>
+          <query>| datamodel DevOps_Code DevOps_Commit flat | search repository_organization IN ($orgTkn$) repository_name IN ($repoTkn$) | eval has_issue=if(isnotnull(issueNumber), 1,0) | stats count, sum(has_issue) as has_issue | eval ratio=round(has_issue/count,2)*100 | fields ratio</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unit">%</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Commit Count by Branch</title>
+      <table>
+        <search>
+          <query>| datamodel DevOps_Code DevOps_Commit flat | search repository_organization IN ($orgTkn$) repository_name IN ($repoTkn$) | stats count by repository_organization, repository_name, commit_branch | rename repository_organization as organization, repository_name as name, commit_branch as branch</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Commit Count by User</title>
+      <table>
+        <search>
+          <query>| datamodel DevOps_Code DevOps_Commit flat | search repository_organization IN ($orgTkn$) repository_name IN ($repoTkn$) | stats count by repository_organization, repository_name, commit_username | fields - repository_organization, repository_name | rename commit_username as username</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Commits Per Push</title>
+      <table>
+        <search>
+          <query>| datamodel DevOps_Code DevOps_Push flat | search repository_organization IN ($orgTkn$) repository_name IN ($repoTkn$) | stats count(commits_list) as count, count(commits_author_list) as authors by repository_organization, repository_name, current_push | stats avg(count) as count, avg(authors) as authors by repository_organization, repository_name | eval count=round(count), authors=round(authors)</query>
+          <earliest>$timeTkn.earliest$</earliest>
+          <latest>$timeTkn.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
