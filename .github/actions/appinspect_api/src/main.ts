@@ -1,6 +1,7 @@
 import { debug, error, getInput, info, setFailed, warning } from '@actions/core';
 import * as fs from 'fs';
-import { getReport, getStatus, login, submit, SubmitResponse } from './api';
+import { getReport, getStatus, login, submit, SubmitResponse } from './api.js';
+import { assertPatchedRuntime, assertReportPassed, splitTags } from './validation.js';
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -52,6 +53,9 @@ async function appInspect({
         warning(`Received ${reportDoc.reports.length} report documents. Expected 1.`);
     }
     const report = reportDoc.reports[0];
+    if (!report) {
+        throw new Error('AppInspect returned no report');
+    }
 
     info(`Received report for app: ${report.app_name} ${report.app_version} [${report.app_hash}]`);
     info(
@@ -95,28 +99,22 @@ async function appInspect({
         }
     }
 
-    if (report.summary.error === 0 && report.summary.failure === 0) {
-        info('Appinspect completed without errors or failures');
-    }
+    assertReportPassed(reportDoc);
+    info('Appinspect completed without errors or failures');
 }
-
-const splitTags = (value: string | null | undefined): string[] | undefined => {
-    if (value) {
-        return value.trim().split(/\s*,\s*/);
-    }
-};
 
 async function run(): Promise<void> {
     try {
-        const filePath: string = getInput('filePath');
-        const user = getInput('splunkUser');
-        const password = getInput('splunkPassword');
+        assertPatchedRuntime(process.versions.node);
+        const filePath: string = getInput('filePath', { required: true });
+        const user = getInput('splunkUser', { required: true });
+        const password = getInput('splunkPassword', { required: true });
         const includedTags = splitTags(getInput('includedTags'));
-        const excludedTags = splitTags(getInput('includedTags'));
+        const excludedTags = splitTags(getInput('excludedTags'));
 
         await appInspect({ user, password, filePath, includedTags, excludedTags });
     } catch (error) {
-        setFailed(error.message);
+        setFailed(error instanceof Error ? error.message : String(error));
     }
 }
 

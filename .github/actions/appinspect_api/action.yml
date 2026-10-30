@@ -2,8 +2,18 @@ name: App Inspect
 description: Run Splunk appinspect for a splunk app bundle
 author: Siegfried Puchbauer
 runs:
-    using: node12
-    main: dist/index.js
+    using: composite
+    steps:
+        # Use the explicitly patched Node installed by the caller's setup-node step.
+        # A JavaScript action would instead use the runner's separate bundled Node.
+        - shell: bash
+          run: node "$GITHUB_ACTION_PATH/dist/index.js"
+          env:
+              INPUT_FILEPATH: ${{ inputs.filePath }}
+              INPUT_SPLUNKUSER: ${{ inputs.splunkUser }}
+              INPUT_SPLUNKPASSWORD: ${{ inputs.splunkPassword }}
+              INPUT_INCLUDEDTAGS: ${{ inputs.includedTags }}
+              INPUT_EXCLUDEDTAGS: ${{ inputs.excludedTags }}
 inputs:
     filePath:
         description: Path to the app bundle file (.tar.gz or .spl)

@@ -1,0 +1,2 @@
+# Preserve the exact ncc output, including upstream template-literal whitespace.
+.github/actions/appinspect_api/dist/* linguist-generated=true whitespace=-blank-at-eol,-blank-at-eof
