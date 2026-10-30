@@ -1,7 +1,6 @@
 import { info } from '@actions/core';
-import FormData from 'form-data';
-import * as fs from 'fs';
-import fetch from 'node-fetch';
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 async function req<T>({
     url,
@@ -12,7 +11,7 @@ async function req<T>({
     method: 'GET' | 'POST';
     url: string;
     headers?: { [k: string]: string };
-    body?: any;
+    body?: BodyInit;
 }): Promise<T> {
     const res = await fetch(url, {
         method,
@@ -20,15 +19,9 @@ async function req<T>({
         headers,
     });
     if (!res.ok) {
-        try {
-            const data = await res.text();
-            throw new Error(`HTTP status ${res.status} from ${url}: ${data}`);
-        } catch (e) {
-            // ignore
-        }
         throw new Error(`HTTP status ${res.status} from ${url}`);
     }
-    return res.json();
+    return (await res.json()) as T;
 }
 
 export interface AuthResponse {
@@ -67,7 +60,8 @@ export async function submit({
     excludedTags?: string[];
 }): Promise<SubmitResponse> {
     const form = new FormData();
-    form.append('app_package', fs.createReadStream(filePath));
+    const packageBytes = new Uint8Array(await readFile(filePath));
+    form.append('app_package', new Blob([packageBytes]), basename(filePath));
     if (includedTags) {
         form.append('included_tags', includedTags.join(','));
     }

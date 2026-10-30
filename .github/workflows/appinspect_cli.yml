@@ -1,74 +1,51 @@
 name: Lint and App Inspect CLI
 
-# Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Python 3.x
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Semantic version range syntax or exact version of a Python version
-          python-version: '3.9'
-          # Optional - x64 or x86 architecture, defaults to x64
-          architecture: 'x64'
-
-      - name: Install deps
-        uses: CultureHQ/actions-yarn@master
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          args: install
-
-      - name: Lint
-        uses: CultureHQ/actions-yarn@master
-        with:
-          args: lint
-
-      - name: Build
-        uses: CultureHQ/actions-yarn@master
-        with:
-          args: build
-
-      - name: Update Version Number
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Validate and package the app
         run: |
-          old_str="X.Y.Z"
-          new_str="1.0.0"
-          sed -i "s/$old_str/$new_str/g" package.json
-          sed -i "s/$old_str/$new_str/g" ./${{ vars.appName }}/default/app.conf
-          cat package.json
-          cat ./${{ vars.appName }}/default/app.conf
-
-      - name: Install slim
+          npm run lint
+          npm test
+          npm run package -- 0.0.0
+      - name: Validate the AppInspect API action and its committed bundle
         run: |
-          pip install https://download.splunk.com/misc/packaging-toolkit/splunk-packaging-toolkit-1.0.1.tar.gz
-
-      - name: Create package
+          npm ci --prefix .github/actions/appinspect_api
+          npm run all --prefix .github/actions/appinspect_api
+          git diff --exit-code -- .github/actions/appinspect_api/dist
+      - name: Run AppInspect CLI
         run: |
-          mkdir build
-          slim package ./${{ vars.appName }}
-
-      - name: Run App Inspect CLI
-        uses: splunk/appinspect-cli-action@v1.5
+          docker run --rm --entrypoint splunk-appinspect \
+            -v "$GITHUB_WORKSPACE:/github/workspace" -w /github/workspace \
+            ghcr.io/splunk/appinspect-cli-action/appinspect-cli-action:v2.18.0@sha256:484c64057debe2d5b6c45a5a0849ee28539d511bcd6e86d7846bce1399538c5e \
+            inspect dist/splunk_app_for_pipeline_analytics.spl \
+            --output-file appinspect_result.json --mode test --included-tags cloud --included-tags splunk_appinspect
+          node scripts/check-appinspect.mjs appinspect_result.json
+      - name: Upload package and inspection report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          app_path: ${{ vars.appName }}-1.0.0.tar.gz
-          included_tags: cloud, splunk_appinspect
-
-      - name: Upload package
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ vars.appName }}-1.0.0.tar.gz
-          path: ./${{ vars.appName }}-1.0.0.tar.gz
+          name: app-package-and-inspection
+          path: |
+            dist/splunk_app_for_pipeline_analytics.spl
+            appinspect_result.json
+          if-no-files-found: error

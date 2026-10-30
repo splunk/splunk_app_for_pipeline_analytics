@@ -2,52 +2,49 @@ name: App Inspect API
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
 
 jobs:
-    appinspect:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v1
-              with:
-                  node-version: 12.x
-            - uses: actions/cache@v1
-              with:
-                  path: node_modules
-                  key: nodeModules-${{ hashFiles('**/yarn.lock') }}
-                  restore-keys: |
-                      nodeModules-
-            - name: Update Version Number
-              run: |
-                old_str="X.Y.Z"
-                new_str=$(echo "${GITHUB_REF#refs/*/}" | tr -d "v")
-                sed -i "s/$old_str/$new_str/g" package.json
-                sed -i "s/$old_str/$new_str/g" ./${{ vars.appName }}/default/app.conf
-                cat package.json
-                cat ./${{ vars.appName }}/default/app.conf
-            - name: Install dependencies
-              run: yarn install
-              env:
-                  CI: true
-            - name: Build app package
-              run: |
-                  yarn package
-                  mv dist/*.spl dist/${{ vars.appName }}.spl
-            - uses: actions/upload-artifact@v1
-              with:
-                  name: app-package
-                  path: dist/${{ vars.appName }}.spl
-            - uses: ./.github/actions/appinspect_api
-              with:
-                  filePath: ./dist/${{ vars.appName }}.spl
-                  splunkUser: ${{ secrets.SPLUNKBASE_USER }}
-                  splunkPassword: ${{ secrets.SPLUNKBASE_PASSWORD }}
-                  includedTags: cloud
-            - name: Release
-              uses: fnkr/github-action-ghr@v1
-              if: startsWith(github.ref, 'refs/tags/')
-              env:
-                  GHR_PATH: ./dist/${{ vars.appName }}.spl
-                  GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
+  appinspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Validate and build the release package
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          npm run lint
+          npm test
+          npm run package -- "$RELEASE_VERSION"
+      - name: Validate the AppInspect API action and its committed bundle
+        run: |
+          npm ci --prefix .github/actions/appinspect_api
+          npm run all --prefix .github/actions/appinspect_api
+          git diff --exit-code -- .github/actions/appinspect_api/dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-package
+          path: dist/splunk_app_for_pipeline_analytics.spl
+          if-no-files-found: error
+      - uses: ./.github/actions/appinspect_api
+        with:
+          filePath: dist/splunk_app_for_pipeline_analytics.spl
+          splunkUser: ${{ secrets.SPLUNKBASE_USER }}
+          splunkPassword: ${{ secrets.SPLUNKBASE_PASSWORD }}
+          includedTags: cloud
+      - name: Release the inspected package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/splunk_app_for_pipeline_analytics.spl \
+            --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

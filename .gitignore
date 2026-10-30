@@ -1,0 +1,8 @@
+node_modules/
+/dist/
+build/
+*.tgz
+*.spl
+*.tar.gz
+appinspect_result.json
+.DS_Store
